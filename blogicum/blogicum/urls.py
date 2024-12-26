@@ -17,7 +17,7 @@ Including another URLconf
 Для регистрации используется кастомная view-функция
 """
 from django.contrib import admin
-from django.urls import path, include, reverse_lazy
+from django.urls import path, include
 # from django.contrib.auth.forms import UserCreationForm
 # from django.views.generic.edit import CreateView
 # from .forms import MyUserCreationForm
