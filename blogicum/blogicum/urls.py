@@ -18,9 +18,8 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-# from django.contrib.auth.forms import UserCreationForm
-# from django.views.generic.edit import CreateView
-# from .forms import MyUserCreationForm
+from django.conf.urls.static import static
+from django.conf import settings
 from . import views
 
 app_name = 'blog'
@@ -36,4 +35,4 @@ urlpatterns = [
         views.create_user,
         name='registration',
     ),
-]
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

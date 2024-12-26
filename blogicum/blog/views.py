@@ -66,7 +66,7 @@ def category_posts(request, slug):
         'title',
         'description').filter(
         slug__exact=slug,
-        is_published=True,))
+        is_published=True,).order_by('-pub_date'))
     post_list = Post.objects.select_related(
         'category',
         'location',
@@ -155,7 +155,9 @@ def post(request, id=None):
         instance = None
     user = request.user
     username = user.username
-    form = PostForm(request.POST or None, instance=instance)
+    form = PostForm(request.POST or None,
+                    files=request.FILES or None,
+                    instance=instance)
     context = {'form': form}
     if form.is_valid():
         new_post = form.save(commit=False)
