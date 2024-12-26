@@ -28,7 +28,7 @@ class RulesDetailView(TemplateView):
 
 def page_not_found(request, exception):
     template = 'pages/404.html'
-    return render(request, template)
+    return render(request, template, status=404)
 
 
 def csrf_failure(request, reason=''):

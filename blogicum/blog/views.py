@@ -115,10 +115,8 @@ def profile(request, username):
         'category',
         'location',
         'author').filter(
-            pub_date__lte=datetime.now(),
-            is_published=True,
             author__username__exact=username
-    )
+    ).order_by('-pub_date')
     for obj in posts:  # Добавление атрибута с количеством комментариев
         post_id = obj.id
         count = len(Comment.objects.select_related(
@@ -248,8 +246,7 @@ def delete_comment(request, post_id, comment_id):
         'post'
     ), pk=comment_id)
     instance.post_id = post_id  # Добавление атрибута с id поста
-    form = PostForm(instance=instance)
-    context = {'form': form, 'comment': instance}
+    context = {'comment': instance}
     if request.method == 'POST':
         instance.delete()
         return redirect('blog:post_detail', id=post_id)
