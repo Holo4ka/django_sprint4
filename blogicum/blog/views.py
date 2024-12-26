@@ -66,7 +66,7 @@ def category_posts(request, slug):
         'title',
         'description').filter(
         slug__exact=slug,
-        is_published=True,).order_by('-pub_date'))
+        is_published=True,))
     post_list = Post.objects.select_related(
         'category',
         'location',
@@ -74,7 +74,7 @@ def category_posts(request, slug):
         pub_date__lte=datetime.now(),
         is_published=True,
         category__slug__exact=slug
-    )
+    ).order_by('-pub_date')
     for obj in post_list:  # Добавление атрибута с количеством комментариев
         post_id = obj.id
         count = len(Comment.objects.select_related(
@@ -136,6 +136,8 @@ def post(request, id=None):
     Страница создания или изменения поста.
     За определение цели отвечает наличие параметра id
     """
+    user = request.user
+    username = user.username
     # Если в запросе указан pk (т.е. получен запрос на редактирование объекта):
     if id is not None:
         # Получаем объект модели или выбрасываем 404 ошибку.
@@ -147,14 +149,13 @@ def post(request, id=None):
             Q(pub_date__lte=datetime.now())
             & Q(is_published=True)
             & Q(category__is_published=True)
+            & Q(author__username__exact=username)
         ), pk=id)
     # Если в запросе не указан pk
     # (если получен запрос к странице создания записи):
     else:
         # Связывать форму с объектом не нужно, установим значение None.
         instance = None
-    user = request.user
-    username = user.username
     form = PostForm(request.POST or None,
                     files=request.FILES or None,
                     instance=instance)
@@ -173,13 +174,15 @@ def post(request, id=None):
 def delete_post(request, post_id):
     """Страница удаления поста"""
     # Получаем объект модели или выбрасываем 404 ошибку.
+    username = request.user.username
     instance = get_object_or_404(Post.objects.select_related(
         'category',
         'location',
         'author').filter(
             Q(pub_date__lte=datetime.now())
             & Q(is_published=True)
-            & Q(category__is_published=True), pk=post_id))
+            & Q(category__is_published=True)
+            & Q(author__username__exact=username), pk=post_id))
     # В форму передаём только объект модели;
     # передавать в форму параметры запроса не нужно.
     form = PostForm(instance=instance)
@@ -223,10 +226,11 @@ def edit_comment(request, post_id, comment_id):
     Для корректной работы необходимо передавать в контекст
     сам комментарий.
     """
+    username = request.user.username
     instance = get_object_or_404(Comment.objects.select_related(
         'post',
         'author'
-    ), pk=comment_id)
+    ).filter(author__username__exact=username), pk=comment_id)
     instance.post_id = post_id  # Добавление атрибута с id поста
     form = CommentForm(request.POST or None, instance=instance)
     context = {'form': form, 'comment': instance}
