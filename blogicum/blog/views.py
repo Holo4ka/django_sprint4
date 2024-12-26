@@ -43,11 +43,14 @@ def index(request):
 def post_detail(request, id):
     """Отображение страницы конкретного поста"""
     template = 'blog/detail.html'
+    username = request.user.username
     post = get_object_or_404(
         Post.objects.select_related('category', 'location', 'author').filter(
-            Q(pub_date__lte=datetime.now())
-            & Q(is_published=True)
-            & Q(category__is_published=True)
+            Q(
+                Q(pub_date__lte=datetime.now())
+                & Q(is_published=True)
+                & Q(category__is_published=True))
+            | Q(author__username__exact=username)
         ),
         pk=id)
     comments = Comment.objects.select_related(
@@ -130,6 +133,7 @@ def profile(request, username):
     return render(request, template, context=context)
 
 
+@login_required
 def post(request, id=None):
     """
     Страница создания или изменения поста.
@@ -160,15 +164,37 @@ def post(request, id=None):
                     instance=instance)
     context = {'form': form}
     if form.is_valid():
-        if request.user.is_authenticated:
-            new_post = form.save(commit=False)
-            new_post.author = user
-            new_post.save()
-            if id:
-                return redirect('blog:post_detail', id=id)
-            return redirect('blog:profile', username=username)
-        if not request.user.is_authenticated and id:
+        new_post = form.save(commit=False)
+        new_post.author = user
+        new_post.save()
+        if id:
             return redirect('blog:post_detail', id=id)
+        return redirect('blog:profile', username=username)
+
+    return render(request, 'blog/create.html', context)
+
+
+@login_required
+def edit_post(request, id):
+    instance = get_object_or_404(Post.objects.select_related(
+        'category',
+        'location',
+        'author'
+    ).filter(
+        Q(pub_date__lte=datetime.now())
+        & Q(is_published=True)
+        & Q(category__is_published=True)
+    ), pk=id)
+    author = instance.author
+    if author != request.user:
+        return redirect('blog:post_detail', id=id)
+    form = PostForm(request.POST or None,
+                    files=request.FILES or None,
+                    instance=instance)
+    context = {'form': form}
+    if form.is_valid():
+        form.save()
+        return redirect('blog:post_detail', id=id)
     return render(request, 'blog/create.html', context)
 
 
@@ -227,15 +253,16 @@ def edit_comment(request, post_id, comment_id):
     Для корректной работы необходимо передавать в контекст
     сам комментарий.
     """
-    username = request.user.username
+    user = request.user
+    username = user.username
     instance = get_object_or_404(Comment.objects.select_related(
         'post',
         'author'
     ).filter(author__username__exact=username), pk=comment_id)
     instance.post_id = post_id  # Добавление атрибута с id поста
-    form = CommentForm(instance=instance)
+    form = CommentForm(request.POST or None, instance=instance)
     context = {'form': form, 'comment': instance}
-    if form.is_valid() and request.method == 'POST':
+    if form.is_valid():
         form.save()
         return redirect('blog:post_detail', id=post_id)
     return render(request, 'blog/comment.html', context=context)
@@ -254,7 +281,6 @@ def delete_comment(request, post_id, comment_id):
         'post'
     ).filter(
         Q(author__username__exact=username)
-        | Q(user.is_staf)
     ), pk=comment_id)
     instance.post_id = post_id  # Добавление атрибута с id поста
     context = {'comment': instance}
