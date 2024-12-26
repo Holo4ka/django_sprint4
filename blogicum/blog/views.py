@@ -130,7 +130,6 @@ def profile(request, username):
     return render(request, template, context=context)
 
 
-@login_required
 def post(request, id=None):
     """
     Страница создания или изменения поста.
@@ -161,12 +160,15 @@ def post(request, id=None):
                     instance=instance)
     context = {'form': form}
     if form.is_valid():
-        new_post = form.save(commit=False)
-        new_post.author = user
-        new_post.save()
-        if id:
+        if request.user.is_authenticated:
+            new_post = form.save(commit=False)
+            new_post.author = user
+            new_post.save()
+            if id:
+                return redirect('blog:post_detail', id=id)
+            return redirect('blog:profile', username=username)
+        if not request.user.is_authenticated and id:
             return redirect('blog:post_detail', id=id)
-        return redirect('blog:profile', username=username)
     return render(request, 'blog/create.html', context)
 
 
@@ -219,7 +221,6 @@ def comment(request, post_id):
     return render(request, 'blog/detail.html', context=context)
 
 
-@login_required
 def edit_comment(request, post_id, comment_id):
     """
     Страница изменения комментария.
@@ -232,24 +233,28 @@ def edit_comment(request, post_id, comment_id):
         'author'
     ).filter(author__username__exact=username), pk=comment_id)
     instance.post_id = post_id  # Добавление атрибута с id поста
-    form = CommentForm(request.POST or None, instance=instance)
+    form = CommentForm(instance=instance)
     context = {'form': form, 'comment': instance}
-    if form.is_valid():
+    if form.is_valid() and request.method == 'POST':
         form.save()
         return redirect('blog:post_detail', id=post_id)
     return render(request, 'blog/comment.html', context=context)
 
 
-@login_required
 def delete_comment(request, post_id, comment_id):
     """
     Подтверждение удаления комментария.
     Для корректной работы необходимо передавать в контекст
     сам комментарий.
     """
+    user = request.user
+    username = user.username
     instance = get_object_or_404(Comment.objects.select_related(
         'author',
         'post'
+    ).filter(
+        Q(author__username__exact=username)
+        | Q(user.is_staf)
     ), pk=comment_id)
     instance.post_id = post_id  # Добавление атрибута с id поста
     context = {'comment': instance}
