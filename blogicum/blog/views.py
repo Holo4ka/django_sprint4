@@ -112,14 +112,17 @@ def edit_profile(request, username):
 
 def profile(request, username):
     """Страница профиля"""
+    req_username = request.user.username
     template = 'blog/profile.html'
     user = get_object_or_404(User, username=username)
     posts = Post.objects.select_related(
         'category',
         'location',
-        'author').filter(
-            author__username__exact=username
+        'author').filter(Q(author__username__exact=username)
     ).order_by('-pub_date')
+    if req_username != username:
+        posts = posts.filter(pub_date__lte=datetime.now(),
+                             is_published=True,).order_by('-pub_date')
     for obj in posts:  # Добавление атрибута с количеством комментариев
         post_id = obj.id
         count = len(Comment.objects.select_related(
